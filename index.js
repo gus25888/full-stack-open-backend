@@ -1,8 +1,26 @@
 const express = require('express');
+const morgan = require('morgan');
 const app = express()
 const PORT = 3001;
 
 app.use(express.json())
+
+// Config. logs para métodos que no son POST.
+app.use(morgan('tiny', {
+    skip: (req, res) => {
+        return req.method === 'POST'
+    }
+}))
+
+// Config. logs para métodos POST.
+morgan.token('post-data', (req) => JSON.stringify(req.body))
+
+app.use(morgan(
+    ':method :url :status :res[content-length] - :response-time ms :post-data', {
+    skip: (req, res) => {
+        return req.method !== 'POST'
+    }
+}))
 
 let persons = [
     {
