@@ -1,5 +1,9 @@
+require('dotenv').config()
 const express = require('express');
 const morgan = require('morgan');
+
+const Person = require('./models/person')
+
 const app = express()
 const PORT = process.env.PORT || 3001;
 
@@ -48,8 +52,13 @@ let persons = [
 
 /* *********** METHODS *********** */
 app.get('/api/persons', (req, res) => {
-    res.json(persons)
+    Person
+        .find({})
+        .then(result => {
+            res.json(result)
+        })
 })
+
 
 app.get('/api/persons/:id', (req, res) => {
     const id = Number(req.params.id);
@@ -84,20 +93,11 @@ app.post('/api/persons', (req, res) => {
         })
     }
 
-    if (persons.map(person => person.name).includes(name)) {
-        return res.status(400).json({
-            error: 'name already exists in phonebook'
-        })
-    }
+    const newPerson = new Person({ name, number });
 
-    const newPerson = {
-        id: Math.round(Math.random() * (10 ** 5)),
-        name,
-        number,
-    }
-
-    persons.push(newPerson)
-    res.json(newPerson)
+    newPerson
+        .save()
+        .then(personSaved => { res.json(personSaved) })
 })
 app.delete('/api/persons/:id', (req, res) => {
     const id = Number(req.params.id);
