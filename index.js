@@ -32,6 +32,8 @@ const errorHandler = (error, req, res, next) => {
 
     if (error.name === 'CastError') {
         return res.status(400).send({ error: 'wrong formatted id' })
+    } else if (error.name === 'ValidationError') {
+        return res.status(400).send({ error: `${error.message}` })
     }
 
     next(error)
@@ -75,18 +77,6 @@ app.post('/api/persons', (req, res, next) => {
     }
 
     const { name, number } = data;
-
-    if (!name) {
-        return res.status(400).json({
-            error: 'name is missing'
-        })
-    }
-    if (!number) {
-        return res.status(400).json({
-            error: 'number is missing'
-        })
-    }
-
     const newPerson = new Person({ name, number });
 
     newPerson
@@ -111,9 +101,10 @@ app.delete('/api/persons/:id', (req, res, next) => {
 app.put('/api/persons/:id', (req, res, next) => {
     const { name, number } = req.body;
     const personToUpdate = { name, number }
+    const options = { new: true, runValidators: true, context: 'query' };
 
     Person
-        .findByIdAndUpdate(req.params.id, personToUpdate, { new: true })
+        .findByIdAndUpdate(req.params.id, personToUpdate, options)
         .then(result => {
             if (result) {
                 return res.json(result)
