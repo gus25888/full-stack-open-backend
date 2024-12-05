@@ -11,67 +11,61 @@ app.use(express.json())
 app.use(express.static('dist'))
 
 // Config. logs para métodos que no son POST.
-app.use(morgan('tiny', {
-    skip: (req, res) => {
-        return req.method === 'POST'
-    }
-}))
+app.use(
+    morgan('tiny', {
+        skip: (req, res) => req.method === 'POST'
+    })
+)
 
 // Config. logs para métodos POST.
 morgan.token('post-data', (req) => JSON.stringify(req.body))
 
-app.use(morgan(
-    ':method :url :status :res[content-length] - :response-time ms :post-data', {
-    skip: (req, res) => {
-        return req.method !== 'POST'
-    }
-}))
+app.use(
+    morgan(
+        ':method :url :status :res[content-length] - :response-time ms :post-data',
+        { skip: (req, res) => req.method !== 'POST' }
+    )
+)
 
-let persons = [
-    {
-        "id": "1",
-        "name": "Arto Hellas",
-        "number": "040-123456"
-    },
-    {
-        "id": "2",
-        "name": "Ada Lovelace",
-        "number": "39-44-5323523"
-    },
-    {
-        "id": "3",
-        "name": "Dan Abramov",
-        "number": "12-43-234345"
-    },
-    {
-        "id": "4",
-        "name": "Mary Poppendieck",
-        "number": "39-23-6423122"
+const errorHandler = (error, req, res, next) => {
+    console.error(error.name, ':', error.message);
+
+    if (error.name === 'CastError') {
+        return res.status(400).send({ error: 'wrong formatted id' })
     }
-]
+
+    next(error)
+}
 
 /* *********** METHODS *********** */
-app.get('/api/persons', (req, res) => {
+app.get('/api/persons', (req, res, next) => {
     Person
         .find({})
         .then(result => {
-            res.json(result)
+            if (result) {
+                return res.json(result)
+            } else {
+                return res.status(404).end()
+            }
         })
+        .catch(error => next(error))
 })
 
 
-app.get('/api/persons/:id', (req, res) => {
-    const id = Number(req.params.id);
-    const personFound = persons.find(person => person.id === id)
-    if (personFound) {
-        return res.json(personFound)
-    }
-    else {
-        return res.status(404).end()
-    }
+app.get('/api/persons/:id', (req, res, next) => {
+    Person
+        .findById(req.params.id)
+        .then(result => {
+            if (result) {
+                return res.json(result)
+            } else {
+                return res.status(404).end()
+            }
+        })
+        .catch(error => next(error))
 })
 
-app.post('/api/persons', (req, res) => {
+app.post('/api/persons', (req, res, next) => {
     const data = req.body;
 
     if (!data) {
@@ -97,28 +91,79 @@ app.post('/api/persons', (req, res) => {
 
     newPerson
         .save()
-        .then(personSaved => { res.json(personSaved) })
-})
-app.delete('/api/persons/:id', (req, res) => {
-    const id = Number(req.params.id);
-    persons = persons.filter(person => person.id !== id)
-
-    res.status(204).end()
-})
-
-
-app.get('/info', (req, res) => {
-    res.send(
-        `<p>
-        Phonebook has info for ${persons.length} people
-        </p>
-        <p>
-        ${new Date()}
-        </p>
-        `
-    )
+        .then(result => {
+            if (result) {
+                return res.json(result)
+            } else {
+                return res.status(404).end()
+            }
+        })
+        .catch(error => next(error))
 })
 
+app.delete('/api/persons/:id', (req, res, next) => {
+    Person
+        .findByIdAndDelete(req.params.id)
+        .then(result => { res.status(204).end() })
+        .catch(error => next(error))
+})
+
+app.put('/api/persons/:id', (req, res, next) => {
+    const { name, number } = req.body;
+    const personToUpdate = { name, number }
+
+    Person
+        .findByIdAndUpdate(req.params.id, personToUpdate, { new: true })
+        .then(result => {
+            if (result) {
+                return res.json(result)
+            } else {
+                return res.status(404).end()
+            }
+        })
+        .catch(error => next(error))
+})
+
+app.get('/info', (req, res, next) => {
+    let peopleCount = 0;
+
+    Person
+        .find({})
+        .then(result => {
+            if (result) {
+                peopleCount = result.length;
+            }
+
+            res.send(
+                `<p>
+                Phonebook has info for ${peopleCount} people
+                </p>
+                <p>
+                ${new Date()}
+                </p>
+                `
+            )
+        })
+        .catch(error => {
+            res.send(
+                `<p>
+                Phonebook is disconnected
+                </p>
+                <p>
+                ${new Date()}
+                </p>
+                `
+            )
+        })
+})
+
+const unknownEndpoint = (req, res, next) => {
+    res.status(404).send({ error: 'unknown endpoint' })
+}
+
+app.use(unknownEndpoint)
+
+app.use(errorHandler)
 
 /* *********** SERVER INIT *********** */
 app.listen(PORT, () => {
